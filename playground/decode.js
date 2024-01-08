@@ -1,0 +1,35 @@
+var fs = require("fs");
+var path = require("path");
+var cheerio = require('cheerio');
+var encryption = require("../encryption");
+var deobfuscators = require("../deobfuscators");
+var sampleNo = "1";
+var baseInDir = path.join("..", "samples", sampleNo);
+var baseOutDir = path.join("output", sampleNo);
+var inputMainName = path.join(baseInDir, "v1.js");
+var inputIndexHtml = path.join(baseInDir, "index.html");
+var inputChallenge1Name = path.join(baseInDir, "challenge1.encrjs");
+var inputChallenge2Name = path.join(baseInDir, "challenge2.encrjs");
+fs.mkdirSync(baseOutDir, { recursive: true });
+var outputMainName = path.join(baseOutDir, "v1.decrypted.js");
+var outputChallenge1Name = path.join(baseOutDir, "challenge1.decrypted.js");
+var outputChallenge2Name = path.join(baseOutDir, "challenge2.decrypted.js");
+var mainContent = fs.readFileSync(inputMainName, { encoding: "utf8" });
+var ch1Content = fs.readFileSync(inputChallenge1Name, { encoding: "utf8" });
+var ch2Content = fs.readFileSync(inputChallenge2Name, { encoding: "utf8" });
+var htmlContent = fs.readFileSync(inputIndexHtml, { encoding: "utf8" });
+var $html = cheerio.load(htmlContent);
+var $scripts = $html("script");
+var scriptWithConfigContent = $scripts
+    .filter(function (ix, node) { return !!node.children.length; })
+    .map(function (_, n) { return n.children[0].data; })[0];
+var cfg = deobfuscators.extractPrerenderedCfg(scriptWithConfigContent);
+var cRay = cfg.cRay;
+var ch1Decoded = encryption.decrypt(ch1Content, cRay);
+var ch2Decoded = encryption.decrypt(ch2Content, cRay);
+var mainDeobfuscated = deobfuscators.v1Main(mainContent);
+var ch1Deobfuscated = deobfuscators.v1Challenge(ch1Decoded, cRay);
+var ch2Deobfuscated = deobfuscators.v1Challenge(ch2Decoded, cRay);
+fs.writeFileSync(outputMainName, mainDeobfuscated, { encoding: "utf8" });
+fs.writeFileSync(outputChallenge1Name, ch1Deobfuscated, { encoding: "utf8" });
+fs.writeFileSync(outputChallenge2Name, ch2Deobfuscated, { encoding: "utf8" });
